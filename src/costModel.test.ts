@@ -17,8 +17,8 @@ describe('默认输入：question 3,000 不变，state 150 在变，1 道题', (
     expect(cost.pplxFlash).toBeCloseTo(3150 * 0.01, 9);
   });
 
-  it('OpenAI 把标准挪进 input 前缀后命中缓存', () => {
-    expect(cost.openai).toBeCloseTo(3000 * 0.01 + (150 + 30) * 0.1, 9);
+  it('OpenAI 的 question 不能缓存，按 state + question 全价计', () => {
+    expect(cost.openai).toBeCloseTo(3150 * 0.1, 9);
   });
 
   it('DeepSeek Flash 默认按高峰价：前缀命中，state 和结尾标记未命中，另加输出', () => {
@@ -43,10 +43,10 @@ describe('默认输入：question 3,000 不变，state 150 在变，1 道题', (
     expect(cheapest(results).map((r) => r.id)).toEqual(['pplxFlash']);
   });
 
-  it('只看默认显示的 Jev、OpenAI、Gemini、DeepSeek 时，最便宜的是 OpenAI', () => {
+  it('只看默认显示的 Jev、OpenAI、Gemini、DeepSeek 时，最便宜的是 DeepSeek Flash', () => {
     const shown: SchemeId[] = ['jev', 'openai', 'gemini', 'deepseek'];
     const results = computeAll(DEFAULT_INPUTS).filter((r) => shown.includes(r.id));
-    expect(cheapest(results).map((r) => r.id)).toEqual(['openai']);
+    expect(cheapest(results).map((r) => r.id)).toEqual(['deepseek']);
   });
 
   it('DeepSeek 的全名带上当前价格档', () => {
@@ -84,24 +84,58 @@ describe('state 不变、question 在变', () => {
   });
 });
 
-describe('OpenAI 的 1,024 token 门槛', () => {
-  it('question 1,023 token 时全价，1,024 token 时命中', () => {
-    expect(perMillionById({ questionTokens: 1023 }).openai).toBeCloseTo((150 + 1023) * 0.1, 9);
-    expect(perMillionById({ questionTokens: 1024 }).openai).toBeCloseTo(1024 * 0.01 + 180 * 0.1, 9);
+describe('OpenAI 的 1,024 token 门槛只看不变的 state', () => {
+  it('state 不变时，state 1,023 token 按全价，1,024 token 命中', () => {
+    const openaiAt = (stateTokens: number) =>
+      perMillionById({ fixedPart: 'state', stateTokens, questionTokens: 200 }).openai;
+    expect(openaiAt(1023)).toBeCloseTo((1023 + 200) * 0.1, 9);
+    expect(openaiAt(1024)).toBeCloseTo(1024 * 0.01 + 200 * 0.1, 9);
+  });
+
+  it('question 不变时，question 多长、题数多少都按全价，和 Gemini 相同', () => {
+    for (const questionTokens of [1023, 1024, 20000, 100000]) {
+      for (const questionCount of [1, 10, 100]) {
+        const cost = perMillionById({ questionTokens, questionCount });
+        expect(cost.openai).toBeCloseTo((150 + questionTokens) * 0.1, 9);
+        expect(cost.openai).toBeCloseTo(cost.gemini, 9);
+      }
+    }
   });
 });
 
 describe('题数', () => {
-  it('影响 DeepSeek 的输出 token 和 OpenAI 的短题干，不影响其他方案', () => {
+  it('只影响 DeepSeek 的输出 token，不影响其他方案', () => {
     const cost = perMillionById({ questionCount: 10 });
     expect(cost.deepseek).toBeCloseTo((100 + 3000) * 0.006 + 160 * 0.3 + 50 * 1.2, 9);
-    expect(cost.openai).toBeCloseTo(3000 * 0.01 + (150 + 300) * 0.1, 9);
+    expect(cost.openai).toBeCloseTo(3150 * 0.1, 9);
     expect(cost.jev).toBeCloseTo(3150 * 0.042, 9);
   });
+});
 
-  it('短题干多到挪动不划算时，OpenAI 回到全价', () => {
-    const cost = perMillionById({ questionTokens: 1100, questionCount: 40 });
-    expect(cost.openai).toBeCloseTo((150 + 1100) * 0.1, 9);
+describe('Jev 长上下文提示', () => {
+  const jevNotes = (overrides: Partial<Inputs>) =>
+    computeAll({ ...DEFAULT_INPUTS, ...overrides }).find((r) => r.id === 'jev')!.notes;
+
+  it('默认输入不提示', () => {
+    expect(jevNotes({})).toEqual([]);
+  });
+
+  it('state 加全部题目超过每请求 64k 时提示，即使每题没超过 32k', () => {
+    expect(jevNotes({ questionTokens: 100000, questionCount: 10 })).toEqual([
+      '超过默认的上下文上限（每请求 64k），需要带长上下文请求头，单价不变。',
+    ]);
+  });
+
+  it('只超过每题 32k 时只提每题', () => {
+    expect(jevNotes({ stateTokens: 40000, questionTokens: 1000 })).toEqual([
+      '超过默认的上下文上限（每题 32k），需要带长上下文请求头，单价不变。',
+    ]);
+  });
+
+  it('两个上限都超过时一起提示', () => {
+    expect(jevNotes({ stateTokens: 100000, questionTokens: 100000 })).toEqual([
+      '超过默认的上下文上限（每请求 64k、每题 32k），需要带长上下文请求头，单价不变。',
+    ]);
   });
 });
 

@@ -8,7 +8,7 @@ interface Props {
   onChange: (n: number) => void;
 }
 
-const HINT = `每次调用问几道题（${QUESTION_COUNT_RANGE.min}–${QUESTION_COUNT_RANGE.max}）。只影响 DeepSeek 的输出 token 和 OpenAI 保留的短题干。`;
+const HINT = `每次调用问几道题（${QUESTION_COUNT_RANGE.min}–${QUESTION_COUNT_RANGE.max}）。只影响 DeepSeek 的输出 token。`;
 
 export function QuestionCount({ value, onChange }: Props) {
   const [draft, setDraft] = useState(String(value));

@@ -20,8 +20,6 @@ export interface Estimates {
   deepseekTailTokens: number;
   /** DeepSeek：关闭 thinking 后，每道题输出一个短标签加分隔或结束符的 token 数。 */
   deepseekOutputTokensPerQuestion: number;
-  /** OpenAI：把固定标准挪进 input 后，每道题留在 questions 里的短题干和选项名。 */
-  openaiResidualQuestionTokens: number;
 }
 
 /** 默认是消息分流场景：question（消息质量标准）约 3,000 token，state（一条消息）约 150 token。 */
@@ -37,7 +35,6 @@ export const DEFAULT_ESTIMATES: Estimates = {
   deepseekTemplateTokens: 100,
   deepseekTailTokens: 10,
   deepseekOutputTokensPerQuestion: 5,
-  openaiResidualQuestionTokens: 30,
 };
 
 export const TOKEN_RANGE = { min: 10, max: 100_000 } as const;

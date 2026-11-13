@@ -14,6 +14,8 @@ export const JEV = {
   model: 'jev-1.14.0',
   inputPerM: 0.042,
   outputPerM: 0,
+  /** 默认的每请求上下文（state + 全部题目）；超出要带长上下文请求头，单价不变。 */
+  perRequestContextTokens: 64_000,
   /** 默认的每题上下文（state + 任意一道题）；超出要带长上下文请求头，单价不变。 */
   perQuestionContextTokens: 32_000,
   sources: [
@@ -105,7 +107,7 @@ export const DEEPSEEK_FLASH = {
     '缓存是尽力而为，不保证 100% 命中。构建要几秒，不再使用后一般几小时到几天内清除。',
   ],
   sources: [
-    { label: 'DeepSeek · 模型 & 价格', url: 'https://api-docs.deepseek.com/zh-cn/quick_start/pricing/' },
+    { label: 'DeepSeek · Models & Pricing', url: 'https://api-docs.deepseek.com/quick_start/pricing/' },
     { label: 'DeepSeek · 上下文硬盘缓存', url: 'https://api-docs.deepseek.com/zh-cn/guides/kv_cache/' },
     { label: 'DeepSeek · 思考模式', url: 'https://api-docs.deepseek.com/zh-cn/guides/thinking_mode' },
   ],

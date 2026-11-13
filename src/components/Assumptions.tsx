@@ -32,14 +32,13 @@ export function Assumptions({ inputs, results }: { inputs: Inputs; results: Sche
       <ul>
         <li>
           Jev、Perplexity：state 和所有题放进同一次请求，state 只计一次（Perplexity 用 v1.3 系列）。官方没有公布跨请求缓存，按全价计。Jev
-          超过默认的 32k 每题上下文时要带长上下文请求头，单价不变。
+          超过默认的每请求 64k 或每题 32k 上下文时要带长上下文请求头，单价不变。
         </li>
         <li>Gemini：官方明确不支持缓存，跨请求重复的内容全额计费。按付费层价格计；免费层不收费，但有用量限制。</li>
         <li>
-          OpenAI：question 不变时，把固定标准挪到共享 input 的最前面，在标准末尾加显式断点，并把{' '}
-          <code>prompt_cache_options.mode</code> 设为 <code>explicit</code>；state 放在断点之后按普通价计，questions 里每道题只留约{' '}
-          {est.openaiResidualQuestionTokens} token 的短题干和选项名。state 不变时，把 state 放进 input，用默认的隐式断点。可缓存的前缀不足{' '}
-          {formatTokens(OPENAI.minCachePrefixTokens)} token 时按全价计，不用填充文本凑数。缓存至少保留 30 分钟；首次调用或过期后那一次，前缀按写入价{' '}
+          OpenAI：question 一律不能缓存，只有共享 input 开头的 state 能命中。question 不变时 state 每次都变，没有可命中的前缀，按全价计。state
+          不变时把 state 放进 input，用默认的隐式断点；state 不足 {formatTokens(OPENAI.minCachePrefixTokens)} token
+          时按全价计，不用填充文本凑数。缓存至少保留 30 分钟；首次调用或过期后那一次，前缀按写入价{' '}
           {formatPrice(OPENAI.cacheWrite30mPerM)}/M 计。命中不保证。不含数据驻留的 10% 加价。
         </li>
         <li>

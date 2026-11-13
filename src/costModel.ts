@@ -72,10 +72,11 @@ const FULL_PRICE_TAG = '没有跨请求缓存，按全价';
 
 function jev(inputs: Inputs): SchemeResult {
   const { stateTokens: s, questionTokens: q, questionCount: n } = inputs;
-  const notes: string[] = [];
-  if (s + q / n > JEV.perQuestionContextTokens) {
-    notes.push('超过 Jev 默认的 32k 每题上下文，需要带长上下文请求头，单价不变。');
-  }
+  const exceeded: string[] = [];
+  if (s + q > JEV.perRequestContextTokens) exceeded.push('每请求 64k');
+  if (s + q / n > JEV.perQuestionContextTokens) exceeded.push('每题 32k');
+  const notes =
+    exceeded.length > 0 ? [`超过默认的上下文上限（${exceeded.join('、')}），需要带长上下文请求头，单价不变。`] : [];
   return finish({
     id: 'jev',
     group: 'decision',
@@ -87,43 +88,20 @@ function jev(inputs: Inputs): SchemeResult {
   });
 }
 
-function openai(inputs: Inputs, est: Estimates): SchemeResult {
-  const { stateTokens: s, questionTokens: q, fixedPart, questionCount: n } = inputs;
+function openai(inputs: Inputs): SchemeResult {
+  const { stateTokens: s, questionTokens: q, fixedPart } = inputs;
   const min = OPENAI.minCachePrefixTokens;
   const base = { id: 'openai', group: 'decision', name: OPENAI.name, model: OPENAI.model } as const;
-  const fullPrice = [line('uncached', 'state + question', s + q, OPENAI.uncachedInputPerM)];
-  const belowThreshold = (part: string): SchemeResult =>
+  const fullPrice = (tag: string): SchemeResult =>
     finish({
       ...base,
-      lines: fullPrice,
-      tag: `不变的 ${part} 不足 ${fmt(min)} token，不能缓存，按全价`,
+      lines: [line('uncached', 'state + question', s + q, OPENAI.uncachedInputPerM)],
+      tag,
       notes: [],
     });
 
-  if (fixedPart === 'question') {
-    if (q < min) return belowThreshold('question');
-    const residual = n * est.openaiResidualQuestionTokens;
-    const moved = [
-      line('cached', 'question 的固定标准（挪进 input 前缀）', q, OPENAI.cachedInputPerM),
-      line('uncached', `state + 短题干 ${fmt(residual)} token`, s + residual, OPENAI.uncachedInputPerM),
-    ];
-    if (total(moved) >= total(fullPrice)) {
-      return finish({
-        ...base,
-        lines: fullPrice,
-        tag: '短题干太多，挪进 input 反而更贵，按全价',
-        notes: [],
-      });
-    }
-    return finish({
-      ...base,
-      lines: moved,
-      tag: `固定标准挪进 input 前缀，命中 ${fmt(q)} token`,
-      notes: [],
-    });
-  }
-
-  if (s < min) return belowThreshold('state');
+  if (fixedPart === 'question') return fullPrice('question 不能缓存，按全价');
+  if (s < min) return fullPrice(`不变的 state 不足 ${fmt(min)} token，不能缓存，按全价`);
   return finish({
     ...base,
     lines: [
@@ -184,7 +162,7 @@ function deepseek(inputs: Inputs, est: Estimates): SchemeResult {
 export function computeAll(inputs: Inputs, est: Estimates = DEFAULT_ESTIMATES): SchemeResult[] {
   return [
     jev(inputs),
-    openai(inputs, est),
+    openai(inputs),
     gemini(inputs),
     perplexity(inputs, false),
     perplexity(inputs, true),
