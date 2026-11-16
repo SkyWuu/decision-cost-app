@@ -22,11 +22,13 @@ export function formatPerMillion(usd: number): string {
   return `$${roundTo(usd, 0).toLocaleString('en-US')}`;
 }
 
-/** 单次调用的成本，保留三位有效数字并写成小数：$0.0000315。 */
+/** 单次调用的成本，按十进制四舍五入保留三位有效数字并写成小数：$0.0000315。 */
 export function formatPerCall(usd: number): string {
   if (usd <= 0) return '$0';
-  const digits = Math.max(2, 2 - Math.floor(Math.log10(usd)));
-  return `$${usd.toFixed(digits)}`;
+  const decimals = (x: number) => Math.max(2, 2 - Math.floor(Math.log10(x)));
+  // 进位可能跨过 10 的整数次幂（0.0009995 → 0.00100），所以按舍入后的值重新数位数。
+  const digits = decimals(roundTo(usd, decimals(usd)));
+  return `$${roundTo(usd, digits).toFixed(digits)}`;
 }
 
 export function formatRatio(ratio: number): string {

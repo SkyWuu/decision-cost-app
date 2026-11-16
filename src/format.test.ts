@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { formatPerMillion } from './format';
+import { DEFAULT_INPUTS } from './config/assumptions';
+import { computeAll } from './costModel';
+import { formatPerCall, formatPerMillion } from './format';
 
 describe('formatPerMillion', () => {
   it('不到 $1 也保留两位小数', () => {
@@ -20,5 +22,29 @@ describe('formatPerMillion', () => {
     expect(formatPerMillion(999.999)).toBe('$1,000');
     expect(formatPerMillion(1000.495)).toBe('$1,000');
     expect(formatPerMillion(30609.6)).toBe('$30,610');
+  });
+});
+
+describe('formatPerCall', () => {
+  it('按十进制四舍五入保留三位有效数字', () => {
+    expect(formatPerCall(150.5 / 1e6)).toBe('$0.000151');
+    expect(formatPerCall(72.6 / 1e6)).toBe('$0.0000726');
+    expect(formatPerCall(0.2 / 1e6)).toBe('$0.000000200');
+    expect(formatPerCall(30609.6 / 1e6)).toBe('$0.0306');
+  });
+
+  it('进位到下一个数量级时仍是三位有效数字', () => {
+    expect(formatPerCall(0.0009995)).toBe('$0.00100');
+    expect(formatPerCall(999.995 / 1e6)).toBe('$0.00100');
+  });
+
+  it('零显示为 $0', () => {
+    expect(formatPerCall(0)).toBe('$0');
+  });
+
+  it('OpenAI $150.50 / 百万次时显示单次 $0.000151', () => {
+    const openai = computeAll({ ...DEFAULT_INPUTS, questionTokens: 1355 }).find((r) => r.id === 'openai')!;
+    expect(formatPerMillion(openai.perMillion)).toBe('$150.50');
+    expect(formatPerCall(openai.perCall)).toBe('$0.000151');
   });
 });
